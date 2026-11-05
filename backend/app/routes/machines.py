@@ -1,3 +1,5 @@
+import io
+
 from flask import Blueprint, jsonify, request, send_file
 from flask_jwt_extended import current_user, jwt_required
 
@@ -7,9 +9,11 @@ from ..schemas.machine import (
     AssignmentSchema,
     MachineListQuerySchema,
     MachineSchema,
+    QrSheetQuerySchema,
     StatusSchema,
 )
 from ..services import machine_service as svc
+from ..services import qr_service
 from ..utils import uploads
 from ..utils.permissions import roles_required
 
@@ -56,7 +60,14 @@ def create_machine():
 @machines_bp.get("/<string:code>")
 @jwt_required()
 def get_machine(code):
-    return _machine_response(_viewable_machine(code))
+    machine = _viewable_machine(code)
+    if "v" in request.args:
+        try:
+            version = int(request.args["v"])
+        except ValueError:
+            raise ApiError("Invalid QR version", 400)
+        svc.ensure_current_qr_version(machine, version)
+    return _machine_response(machine)
 
 
 @machines_bp.patch("/<string:code>")
@@ -122,3 +133,48 @@ def get_photo(code):
     response.headers["Cache-Control"] = "private, max-age=300"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+def _file_response(data, mimetype, filename):
+    response = send_file(io.BytesIO(data), mimetype=mimetype, download_name=filename)
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@machines_bp.get("/<string:code>/qr.png")
+@roles_required(RoleName.ADMIN)
+def qr_png(code):
+    machine = svc.get_machine_by_code(code)
+    if request.args.get("preview") != "1":
+        svc.record_qr_download(current_user, {"format": "png", "machine_code": machine.machine_code}, machine)
+    return _file_response(qr_service.png_bytes(machine), "image/png", f"{machine.machine_code}-qr.png")
+
+
+@machines_bp.get("/<string:code>/qr-label.pdf")
+@roles_required(RoleName.ADMIN)
+def qr_label(code):
+    machine = svc.get_machine_by_code(code)
+    svc.record_qr_download(current_user, {"format": "pdf_label", "machine_code": machine.machine_code}, machine)
+    return _file_response(
+        qr_service.label_pdf_bytes(machine), "application/pdf", f"{machine.machine_code}-label.pdf"
+    )
+
+
+@machines_bp.get("/qr-sheet.pdf")
+@roles_required(RoleName.ADMIN)
+def qr_sheet():
+    args = QrSheetQuerySchema().load(request.args.to_dict())
+    codes = [c for c in args["codes"].split(",") if c.strip()]
+    machines = svc.machines_for_sheet(codes)
+    if not machines:
+        raise ApiError("No active machines to print", 400)
+    svc.record_qr_download(current_user, {"format": "pdf_sheet", "count": len(machines)})
+    return _file_response(qr_service.sheet_pdf_bytes(machines), "application/pdf", "machineqr-labels.pdf")
+
+
+@machines_bp.post("/<string:code>/qr/regenerate")
+@roles_required(RoleName.ADMIN)
+def regenerate_qr(code):
+    machine = svc.get_machine_by_code(code)
+    return _machine_response(svc.regenerate_qr(machine, current_user))

@@ -32,7 +32,7 @@ export function setSessionExpiredHandler(handler) {
 async function refreshAccessToken() {
   const refresh = tokenStore.getRefresh();
   if (!refresh) throw new ApiError("Session expired", 401);
-  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+  const response = await fetch("/api/auth/refresh", {
     method: "POST",
     headers: { Authorization: `Bearer ${refresh}` },
   });
@@ -56,7 +56,7 @@ async function send(path, { method = "GET", body, auth = true, retry = true, res
 
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}/api${path}`, {
+    response = await fetch(`/api${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),

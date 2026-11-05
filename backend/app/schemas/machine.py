@@ -73,3 +73,7 @@ class AssignmentSchema(Schema):
     user_ids = fields.List(
         fields.Integer(), required=True, validate=validate.Length(max=200)
     )
+
+
+class QrSheetQuerySchema(Schema):
+    codes = fields.String(load_default="", validate=validate.Length(max=4000))

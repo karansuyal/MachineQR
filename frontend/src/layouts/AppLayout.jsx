@@ -1,4 +1,4 @@
-import { Cog, LayoutDashboard, LogOut, QrCode, UserCircle, Users } from "lucide-react";
+import { Cog, LayoutDashboard, LogOut, QrCode, ScanLine, UserCircle, Users } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import RoleBadge from "../components/RoleBadge";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import { ROLES } from "../utils/roles";
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/machines", label: "Machines", icon: Cog },
+  { to: "/scan", label: "Scan", icon: ScanLine },
   { to: "/users", label: "Users", icon: Users, roles: [ROLES.ADMIN] },
   { to: "/profile", label: "Profile", icon: UserCircle },
 ];

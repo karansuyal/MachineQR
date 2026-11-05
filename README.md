@@ -2,8 +2,8 @@
 
 Smart Industrial Machine QR Code Management System.
 
-Status: Phases 1 to 4 implemented (setup, database models, authentication and roles, machine management).
-Next: Phase 5 (QR code generation and scanning).
+Status: Phases 1 to 5 implemented (setup, database models, authentication and roles, machine management, QR codes).
+Next: Phase 6 (machine digital profile with tabs).
 
 ## Requirements
 - Python 3.11+
@@ -101,6 +101,33 @@ Behaviour
   to users who may view the machine
 - Machine detail lives at /machine/<code>, which is the URL the QR code will point to in Phase 5
 - Create, update, status change, deactivate, assignment and photo changes are audited
+
+## Phase 5: what exists
+
+No new migration. New setting in `backend/.env`:
+```
+PUBLIC_BASE_URL=http://localhost:5173
+```
+This is the address that gets encoded into every QR code. For phone testing on your WiFi set it to your laptop,
+for example `PUBLIC_BASE_URL=http://192.168.1.20:5173`, restart the backend, and open the frontend with
+`npm run dev -- --host`. For real deployment use the final company address (HTTPS).
+
+QR behaviour
+- QR content is only `<PUBLIC_BASE_URL>/machine/M-001?v=1`. No machine data is inside the QR.
+- Scanning only opens the login page if the person is not signed in; access rules still apply after login.
+- Regenerate increases the QR version. Labels with an older version get an "Outdated QR label" message from the
+  server (HTTP 410) instead of opening the machine. Plain links without `?v=` (for example from the machine list)
+  keep working.
+- Admin can download PNG, single label PDF (80 x 40 mm), print a label, or print an A4 sheet of all active
+  machines (12 labels per page). Downloads are audited; the on-screen preview is not.
+- Print PDFs at 100% scale (no "fit to page"), and scan a test label with a phone before printing a full batch.
+- Labels use a built-in PDF font, so characters outside Latin-1 (for example Hindi names) print as "?". A Unicode
+  font can be added later if needed.
+
+Scanning
+- Phone camera app: works on any address, opens the machine link in the browser.
+- In-app scanner (Scan tab): browsers allow the camera only on HTTPS or localhost. Over plain http on the LAN
+  the page falls back to the camera app or manual Machine ID entry.
 
 ## Known limits (to address later)
 - Tokens are kept in localStorage. Acceptable for an internal network; revisit before internet exposure

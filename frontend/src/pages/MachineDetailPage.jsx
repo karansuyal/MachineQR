@@ -1,6 +1,6 @@
 import { ArrowLeft, Camera, Cog, Pencil, Trash2, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   deactivateMachine,
   getMachine,
@@ -14,6 +14,7 @@ import Button from "../components/Button";
 import { inputClass } from "../components/Field";
 import Spinner from "../components/Spinner";
 import AssignUsersModal from "../components/machines/AssignUsersModal";
+import QrPanel from "../components/machines/QrPanel";
 import StatusBadge from "../components/machines/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { useMachinePhoto } from "../hooks/useAuthImage";
@@ -45,6 +46,8 @@ function InfoGrid({ rows }) {
 
 export default function MachineDetailPage() {
   const { code } = useParams();
+  const [searchParams] = useSearchParams();
+  const qrVersion = searchParams.get("v");
   const { hasRole } = useAuth();
   const isAdmin = hasRole(ROLES.ADMIN);
   const canChangeStatus = hasRole(ROLES.ADMIN, ROLES.TECHNICIAN);
@@ -60,8 +63,8 @@ export default function MachineDetailPage() {
   useEffect(() => {
     setMachine(null);
     setLoadError(null);
-    getMachine(code).then(setMachine).catch(setLoadError);
-  }, [code]);
+    getMachine(code, qrVersion).then(setMachine).catch(setLoadError);
+  }, [code, qrVersion]);
 
   const run = async (action) => {
     setBusy(true);
@@ -91,7 +94,9 @@ export default function MachineDetailPage() {
   if (loadError) {
     return (
       <div className="mx-auto max-w-md pt-10 text-center">
-        <h1 className="text-xl font-semibold text-slate-900">{loadError.status === 403 ? "Not assigned to you" : "Machine unavailable"}</h1>
+        <h1 className="text-xl font-semibold text-slate-900">
+          {{ 403: "Not assigned to you", 410: "Outdated QR label" }[loadError.status] ?? "Machine unavailable"}
+        </h1>
         <p className="mt-2 text-sm text-slate-500">{errorMessage(loadError)}</p>
         <Link to="/machines" className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-navy-800 px-4 text-sm font-medium text-white">Back to machines</Link>
       </div>
@@ -220,6 +225,8 @@ export default function MachineDetailPage() {
           )}
         </>
       )}
+
+      {isAdmin && <QrPanel machine={machine} onChanged={setMachine} />}
 
       {isAdmin && (
         <Card title="Assigned users">

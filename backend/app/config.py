@@ -12,5 +12,6 @@ class Config:
     LOGIN_MAX_ATTEMPTS = 5
     LOGIN_LOCKOUT_MINUTES = 15
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:5173")
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
     CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")

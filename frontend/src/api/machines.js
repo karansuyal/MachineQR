@@ -12,7 +12,8 @@ export function listMachines({ search = "", status = "", department = "", includ
 }
 
 export const getMachineOptions = () => api.get("/machines/options");
-export const getMachine = (code) => api.get(path(code)).then((d) => d.machine);
+export const getMachine = (code, version) =>
+  api.get(`${path(code)}${version ? `?v=${encodeURIComponent(version)}` : ""}`).then((d) => d.machine);
 export const createMachine = (payload) => api.post("/machines", payload).then((d) => d.machine);
 export const updateMachine = (code, payload) => api.patch(path(code), payload).then((d) => d.machine);
 export const setMachineStatus = (code, status) => api.patch(`${path(code)}/status`, { status }).then((d) => d.machine);
@@ -29,3 +30,11 @@ export function uploadMachinePhoto(code, file) {
 
 export const removeMachinePhoto = (code) => api.delete(`${path(code)}/photo`).then((d) => d.machine);
 export const fetchMachinePhoto = (code) => api.get(`${path(code)}/photo`, { responseType: "blob" });
+
+const BLOB = { responseType: "blob" };
+export const fetchMachineQrPng = (code, { preview = false } = {}) =>
+  api.get(`${path(code)}/qr.png${preview ? "?preview=1" : ""}`, BLOB);
+export const fetchMachineLabelPdf = (code) => api.get(`${path(code)}/qr-label.pdf`, BLOB);
+export const fetchLabelSheetPdf = (codes = []) =>
+  api.get(`/machines/qr-sheet.pdf${codes.length ? `?codes=${encodeURIComponent(codes.join(","))}` : ""}`, BLOB);
+export const regenerateMachineQr = (code) => api.post(`${path(code)}/qr/regenerate`).then((d) => d.machine);

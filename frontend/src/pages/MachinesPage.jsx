@@ -1,12 +1,13 @@
-import { ChevronRight, Cog, Plus, Search } from "lucide-react";
+import { ChevronRight, Cog, Plus, Printer, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getMachineOptions, listMachines } from "../api/machines";
+import { fetchLabelSheetPdf, getMachineOptions, listMachines } from "../api/machines";
 import Alert from "../components/Alert";
 import { inputClass } from "../components/Field";
 import Spinner from "../components/Spinner";
 import StatusBadge from "../components/machines/StatusBadge";
 import { useAuth } from "../context/AuthContext";
+import { openBlobInNewTab } from "../utils/download";
 import { errorMessage } from "../utils/errors";
 import { STATUS_OPTIONS } from "../utils/machines";
 import { ROLES } from "../utils/roles";
@@ -22,6 +23,7 @@ export default function MachinesPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [printing, setPrinting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +53,18 @@ export default function MachinesPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const printAllLabels = async () => {
+    setPrinting(true);
+    setError("");
+    try {
+      await openBlobInNewTab(() => fetchLabelSheetPdf(), "machineqr-labels.pdf");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const update = (patch) => setFilters((f) => ({ ...f, ...patch, page: 1 }));
   const items = data?.items ?? [];
 
@@ -59,9 +73,19 @@ export default function MachinesPage() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Machines</h1>
         {isAdmin && (
-          <Link to="/machines/new" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-800 px-4 text-sm font-medium text-white hover:bg-navy-700">
-            <Plus className="h-4 w-4" /> Add machine
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={printAllLabels}
+              disabled={printing}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              aria-label="Print QR labels for all active machines"
+            >
+              <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print labels</span>
+            </button>
+            <Link to="/machines/new" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-800 px-4 text-sm font-medium text-white hover:bg-navy-700">
+              <Plus className="h-4 w-4" /> Add machine
+            </Link>
+          </div>
         )}
       </div>
 

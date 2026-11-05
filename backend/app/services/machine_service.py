@@ -7,6 +7,7 @@ from ..extensions import db
 from ..models import Machine, MachineAssignment, MachineSpecification, Role, User
 from ..models.base import utcnow
 from ..utils import uploads
+from . import qr_service
 from .audit import log_action
 
 EDITABLE_FIELDS = (
@@ -98,6 +99,11 @@ def serialize_detail(machine, user):
         )
     if _is_admin(user):
         data["assigned_users"] = serialize_assigned_users(machine)
+        data.update(
+            qr_version=machine.qr_version,
+            qr_generated_at=_iso(machine.qr_generated_at or machine.created_at),
+            qr_url=qr_service.build_qr_url(machine),
+        )
     return data
 
 
@@ -215,7 +221,9 @@ def create_machine(data, actor):
     _validate_dates(cleaned.get("installation_date"), cleaned.get("commissioning_date"))
 
     for _attempt in range(3):
-        machine = Machine(machine_code=_next_machine_code(), **cleaned)
+        machine = Machine(
+            machine_code=_next_machine_code(), qr_generated_at=utcnow(), **cleaned
+        )
         if status:
             machine.status = MachineStatus(status)
         try:
@@ -352,3 +360,46 @@ def remove_photo(machine, actor):
         db.session.commit()
         uploads.delete_file(old_path)
     return machine
+
+
+def ensure_current_qr_version(machine, version):
+    if version is not None and version != machine.qr_version:
+        raise ApiError("This QR label is outdated. Use the latest label on the machine.", 410)
+
+
+def regenerate_qr(machine, actor):
+    previous = machine.qr_version
+    machine.qr_version = previous + 1
+    machine.qr_generated_at = utcnow()
+    log_action(
+        "machine_qr_regenerated", "machine", machine.id,
+        {"machine_code": machine.machine_code, "from": previous, "to": machine.qr_version},
+        user_id=actor.id,
+    )
+    db.session.commit()
+    return machine
+
+
+def machines_for_sheet(codes):
+    if not codes:
+        return (
+            Machine.query.filter_by(is_active=True)
+            .order_by(func.length(Machine.machine_code), Machine.machine_code)
+            .all()
+        )
+    wanted = list(dict.fromkeys(c.strip().upper() for c in codes if c.strip()))
+    if len(wanted) > 200:
+        raise ApiError("A label sheet can contain at most 200 machines", 400)
+    found = {m.machine_code: m for m in Machine.query.filter(Machine.machine_code.in_(wanted)).all()}
+    missing = [c for c in wanted if c not in found]
+    if missing:
+        raise ApiError(f"Unknown machine IDs: {', '.join(missing)}", 400)
+    return [found[c] for c in wanted if found[c].is_active]
+
+
+def record_qr_download(actor, details, machine=None):
+    log_action(
+        "qr_downloaded", "machine" if machine else None, machine.id if machine else None,
+        details, user_id=actor.id,
+    )
+    db.session.commit()
